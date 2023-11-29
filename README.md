@@ -10,7 +10,9 @@ Inference of [LLaMA](https://arxiv.org/abs/2302.13971) model in pure C/C++
 
 ### Hot topics
 
-- *No hot topics atm. Open to suggestions about what is hot today*
+- Using `llama.cpp` with AWS instances: https://github.com/ggerganov/llama.cpp/discussions/4225
+- Looking for contributions to improve and maintain the `server` example: https://github.com/ggerganov/llama.cpp/issues/4216
+- Collecting Apple Silicon performance stats: https://github.com/ggerganov/llama.cpp/discussions/4167
 
 ----
 
@@ -114,6 +116,8 @@ as the main playground for developing new features for the [ggml](https://github
 - [nat/openplayground](https://github.com/nat/openplayground)
 - [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui)
 - [withcatai/catai](https://github.com/withcatai/catai)
+- [semperai/amica](https://github.com/semperai/amica)
+- [psugihara/FreeChat](https://github.com/psugihara/FreeChat)
 
 ---
 
@@ -422,8 +426,9 @@ Building the program with BLAS support may lead to some performance improvements
     CC=/opt/rocm/llvm/bin/clang CXX=/opt/rocm/llvm/bin/clang++ cmake .. -DLLAMA_HIPBLAS=ON
     cmake --build .
     ```
-  - Using `CMake` for Windows:
+  - Using `CMake` for Windows (using x64 Native Tools Command Prompt for VS):
     ```bash
+    set PATH=%HIP_PATH%\bin;%PATH%
     mkdir build
     cd build
     cmake -G Ninja -DAMDGPU_TARGETS=gfx1100 -DLLAMA_HIPBLAS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
