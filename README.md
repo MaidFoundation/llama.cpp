@@ -112,6 +112,7 @@ as the main playground for developing new features for the [ggml](https://github
 - [x] [Bakllava](https://huggingface.co/models?search=SkunkworksAI/Bakllava)
 - [x] [Obsidian](https://huggingface.co/NousResearch/Obsidian-3B-V0.5)
 - [x] [ShareGPT4V](https://huggingface.co/models?search=Lin-Chen/ShareGPT4V)
+- [x] [MobileVLM 1.7B/3B models](https://huggingface.co/models?search=mobileVLM)
 
 
 **Bindings:**
@@ -128,6 +129,7 @@ as the main playground for developing new features for the [ggml](https://github
 - React Native: [mybigday/llama.rn](https://github.com/mybigday/llama.rn)
 - Java: [kherud/java-llama.cpp](https://github.com/kherud/java-llama.cpp)
 - Zig: [deins/llama.cpp.zig](https://github.com/Deins/llama.cpp.zig)
+- Flutter/Dart: [netdur/llama_cpp_dart](https://github.com/netdur/llama_cpp_dart)
 
 **UI:**
 
