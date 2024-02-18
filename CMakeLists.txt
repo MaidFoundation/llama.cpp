@@ -526,7 +526,7 @@ if (LLAMA_SYCL)
 
     message(STATUS "SYCL found")
 
-    add_compile_definitions(GML_USE_SYCL)
+    add_compile_definitions(GGML_USE_SYCL)
 
     if (LLAMA_SYCL_F16)
         add_compile_definitions(GGML_SYCL_F16)
@@ -778,10 +778,7 @@ endif()
 set(CUDA_CXX_FLAGS "")
 
 if (LLAMA_CUBLAS)
-    set(CUDA_FLAGS ${CXX_FLAGS} -use_fast_math)
-    if (NOT MSVC)
-        list(APPEND CUDA_FLAGS -Wno-pedantic)
-    endif()
+    set(CUDA_FLAGS -use_fast_math)
 
     if (LLAMA_ALL_WARNINGS AND NOT MSVC)
         set(NVCC_CMD ${CMAKE_CUDA_COMPILER} .c)
@@ -814,7 +811,11 @@ if (LLAMA_CUBLAS)
         message("-- CUDA host compiler is ${CUDA_CCID} ${CUDA_CCVER}")
 
         get_flags(${CUDA_CCID} ${CUDA_CCVER})
-        list(APPEND CUDA_CXX_FLAGS ${GF_CXX_FLAGS})  # This is passed to -Xcompiler later
+        list(APPEND CUDA_CXX_FLAGS ${CXX_FLAGS} ${GF_CXX_FLAGS})  # This is passed to -Xcompiler later
+    endif()
+
+    if (NOT MSVC)
+        list(APPEND CUDA_CXX_FLAGS -Wno-pedantic)
     endif()
 endif()
 
