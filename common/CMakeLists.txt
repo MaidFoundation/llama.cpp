@@ -41,11 +41,6 @@ if (EXISTS GIT_INDEX)
     add_library(${TARGET} OBJECT build-info.cpp)
 endif()
 
-if (BUILD_SHARED_LIBS)
-    set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-endif()
-
-
 set(TARGET common)
 
 add_library(${TARGET} STATIC
