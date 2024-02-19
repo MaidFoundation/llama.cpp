@@ -54,6 +54,8 @@
 #define cudaDeviceProp hipDeviceProp_t
 #define cudaDeviceSynchronize hipDeviceSynchronize
 #define cudaError_t hipError_t
+#define cudaErrorPeerAccessAlreadyEnabled hipErrorPeerAccessAlreadyEnabled
+#define cudaErrorPeerAccessNotEnabled hipErrorPeerAccessNotEnabled
 #define cudaEventCreateWithFlags hipEventCreateWithFlags
 #define cudaEventDisableTiming hipEventDisableTiming
 #define cudaEventRecord hipEventRecord
@@ -651,18 +653,18 @@ static __device__ __forceinline__ float2 warp_reduce_sum(float2 a) {
     return a;
 }
 
-static __device__ __forceinline__ half2 warp_reduce_sum(half2 a) {
-#if !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL
-#pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        a = __hadd2(a, __shfl_xor_sync(0xffffffff, a, mask, 32));
-    }
-    return a;
-#else
-    (void) a;
-    NO_DEVICE_CODE;
-#endif // !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL
-}
+//static __device__ __forceinline__ half2 warp_reduce_sum(half2 a) {
+//#if !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL
+//#pragma unroll
+//    for (int mask = 16; mask > 0; mask >>= 1) {
+//        a = __hadd2(a, __shfl_xor_sync(0xffffffff, a, mask, 32));
+//    }
+//    return a;
+//#else
+//    (void) a;
+//    NO_DEVICE_CODE;
+//#endif // !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL
+//}
 
 static __device__ __forceinline__ float warp_reduce_max(float x) {
 #pragma unroll
@@ -672,18 +674,18 @@ static __device__ __forceinline__ float warp_reduce_max(float x) {
     return x;
 }
 
-static __device__ __forceinline__ half2 warp_reduce_max(half2 x) {
-#if !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL && CUDART_VERSION >= CUDART_HMAX
-#pragma unroll
-    for (int mask = 16; mask > 0; mask >>= 1) {
-        x = __hmax2(x, __shfl_xor_sync(0xffffffff, x, mask, 32));
-    }
-    return x;
-#else
-    (void) x;
-    NO_DEVICE_CODE;
-#endif // !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL && CUDART_VERSION >= CUDART_HMAX
-}
+//static __device__ __forceinline__ half2 warp_reduce_max(half2 x) {
+//#if !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL && CUDART_VERSION >= CUDART_HMAX
+//#pragma unroll
+//    for (int mask = 16; mask > 0; mask >>= 1) {
+//        x = __hmax2(x, __shfl_xor_sync(0xffffffff, x, mask, 32));
+//    }
+//    return x;
+//#else
+//    (void) x;
+//    NO_DEVICE_CODE;
+//#endif // !(defined(GGML_USE_HIPBLAS) && defined(__HIP_PLATFORM_AMD__)) && __CUDA_ARCH__ >= CC_PASCAL && CUDART_VERSION >= CUDART_HMAX
+//}
 
 static __device__ __forceinline__ float op_repeat(const float a, const float b) {
     return b;
@@ -4641,10 +4643,12 @@ static __device__ __forceinline__ float vec_dot_iq2_xs_q8_1(
     const float d = (float)bq2->d * __low2float(bq8_1[ib32].ds) * 0.25f;
     return d * ((0.5f + ls1) * sumi1 + (0.5f + ls2) * sumi2);
 #else
+    (void) ksigns64;
     assert(false);
     return 0.f;
 #endif
 #else
+    (void) ksigns64;
     assert(false);
     return 0.f;
 #endif
@@ -6205,7 +6209,7 @@ static __global__ void soft_max_f32(const float * x, const float * mask, const f
         const int ix = rowx*ncols + col;
         const int iy = rowy*ncols + col;
 
-        const float val = x[ix]*scale + (mask ? mask[iy] : 0.0f) + slope*pos[col];
+        const float val = x[ix]*scale + (mask ? mask[iy] : 0.0f) + (pos ? slope*pos[col] : 0.0f);
 
         vals[col] = val;
         max_val = max(max_val, val);
@@ -9170,17 +9174,17 @@ static void ggml_cuda_op_soft_max(
     memcpy(&max_bias, (float *) dst->op_params + 1, sizeof(float));
 
     // positions tensor
-    float * src2_dd = dst_dd; // default to avoid null checks in the kernel
+    float * src2_dd = nullptr;
     cuda_pool_alloc<float> src2_f;
 
     ggml_tensor * src2 = dst->src[2];
     const bool use_src2 = src2 != nullptr;
 
     if (use_src2) {
-        const bool src2_on_device = use_src2 && src2->backend == GGML_BACKEND_GPU;
-        ggml_tensor_extra_gpu * src2_extra = use_src2 ? (ggml_tensor_extra_gpu *) src2->extra : nullptr;
+        const bool src2_on_device = src2->backend == GGML_BACKEND_GPU;
 
         if (src2_on_device) {
+            ggml_tensor_extra_gpu * src2_extra = (ggml_tensor_extra_gpu *) src2->extra;
             src2_dd = (float *) src2_extra->data_device[g_main_device];
         } else {
             src2_dd = src2_f.alloc(ggml_nelements(src2));
@@ -9323,9 +9327,15 @@ static void ggml_cuda_set_peer_access(const int n_tokens) {
             CUDA_CHECK(cudaDeviceCanAccessPeer(&can_access_peer, id, id_other));
             if (can_access_peer) {
                 if (enable_peer_access) {
-                    CUDA_CHECK(cudaDeviceEnablePeerAccess(id_other, 0));
+                    cudaError_t err = cudaDeviceEnablePeerAccess(id_other, 0);
+                    if (err != cudaErrorPeerAccessAlreadyEnabled) {
+                        CUDA_CHECK(err);
+                    }
                 } else {
-                    CUDA_CHECK(cudaDeviceDisablePeerAccess(id_other));
+                    cudaError_t err = cudaDeviceDisablePeerAccess(id_other);
+                    if (err != cudaErrorPeerAccessNotEnabled) {
+                        CUDA_CHECK(err);
+                    }
                 }
             }
         }
@@ -10997,10 +11007,10 @@ GGML_CALL static const char * ggml_backend_cuda_split_buffer_get_name(ggml_backe
     UNUSED(buffer);
 }
 
-// unused at the moment
-//static bool ggml_backend_buffer_is_cuda_split(ggml_backend_buffer_t buffer) {
-//    return buffer->iface.get_name == ggml_backend_cuda_split_buffer_get_name;
-//}
+static bool ggml_backend_buffer_is_cuda_split(ggml_backend_buffer_t buffer) {
+    return buffer->iface.get_name == ggml_backend_cuda_split_buffer_get_name;
+    UNUSED(ggml_backend_buffer_is_cuda_split); // only used in debug builds currently, avoid unused function warning in release builds
+}
 
 GGML_CALL static void ggml_backend_cuda_split_buffer_free_buffer(ggml_backend_buffer_t buffer) {
     ggml_backend_cuda_split_buffer_context * ctx = (ggml_backend_cuda_split_buffer_context *)buffer->context;
@@ -11388,7 +11398,7 @@ GGML_CALL static bool ggml_backend_cuda_graph_compute(ggml_backend_t backend, gg
         for (int j = 0; j < GGML_MAX_SRC; j++) {
             if (node->src[j] != nullptr) {
                 assert(node->src[j]->backend == GGML_BACKEND_GPU || node->src[j]->backend == GGML_BACKEND_GPU_SPLIT);
-                assert(node->src[j]->buffer->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device));
+                assert(node->src[j]->buffer->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device) || ggml_backend_buffer_is_cuda_split(node->src[j]->buffer));
                 assert(node->src[j]->extra != nullptr);
             }
         }
