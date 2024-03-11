@@ -145,6 +145,28 @@ jobs:
           cd build
           ctest -L main --verbose
 
+  ubuntu-22-cmake-vulkan:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Clone
+        id: checkout
+        uses: actions/checkout@v3
+
+      - name: Dependencies
+        id: depends
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential libvulkan-dev
+
+      - name: Build
+        id: cmake_build
+        run: |
+          mkdir build
+          cd build
+          cmake -DLLAMA_VULKAN=ON ..
+          cmake --build . --config Release -j $(nproc)
+
   ubuntu-22-cmake-sycl:
     runs-on: ubuntu-22.04
 
@@ -403,6 +425,8 @@ jobs:
             defines: '-DLLAMA_NATIVE=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_KOMPUTE=ON -DKOMPUTE_OPT_DISABLE_VULKAN_VERSION_CHECK=ON -DBUILD_SHARED_LIBS=ON'
           - build: 'vulkan'
             defines: '-DLLAMA_NATIVE=OFF -DLLAMA_BUILD_SERVER=ON -DLLAMA_VULKAN=ON -DBUILD_SHARED_LIBS=ON'
+          - build: 'arm64'
+            defines: '-A ARM64 -DLLAMA_NATIVE=OFF -DLLAMA_BUILD_SERVER=ON -DBUILD_SHARED_LIBS=ON'
 
     steps:
       - name: Clone
@@ -498,7 +522,7 @@ jobs:
       - name: Test
         id: cmake_test
         # not all machines have native AVX-512
-        if: ${{ matrix.build != 'clblast' && matrix.build != 'kompute' && matrix.build != 'vulkan' && (matrix.build != 'avx512' || env.HAS_AVX512F == '1') }}
+        if: ${{ matrix.build != 'arm64' && matrix.build != 'clblast' && matrix.build != 'kompute' && matrix.build != 'vulkan' && (matrix.build != 'avx512' || env.HAS_AVX512F == '1') }}
         run: |
           cd build
           ctest -L main -C Release --verbose --timeout 900
@@ -669,8 +693,7 @@ jobs:
         run: |
           cd examples/llama.android
 
-          # Skip armeabi-v7a for now (https://github.com/llvm/llvm-project/issues/65820).
-          ./gradlew build --no-daemon -Pskip-armeabi-v7a
+          ./gradlew build --no-daemon
 
 #  freeBSD-latest:
 #    runs-on: macos-12

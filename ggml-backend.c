@@ -12,7 +12,6 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-
 // backend buffer type
 
 const char * ggml_backend_buft_name(ggml_backend_buffer_type_t buft) {
@@ -159,6 +158,13 @@ bool ggml_backend_buffer_copy_tensor(const struct ggml_tensor * src, struct ggml
 
 // backend
 
+ggml_guid_t ggml_backend_guid(ggml_backend_t backend) {
+    if (backend == NULL) {
+        return NULL;
+    }
+    return backend->guid;
+}
+
 const char * ggml_backend_name(ggml_backend_t backend) {
     if (backend == NULL) {
         return "NULL";
@@ -256,11 +262,11 @@ void ggml_backend_graph_plan_free(ggml_backend_t backend, ggml_backend_graph_pla
     backend->iface.graph_plan_free(backend, plan);
 }
 
-void ggml_backend_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
-    backend->iface.graph_plan_compute(backend, plan);
+enum ggml_status ggml_backend_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+    return backend->iface.graph_plan_compute(backend, plan);
 }
 
-bool ggml_backend_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+enum ggml_status ggml_backend_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
     return backend->iface.graph_compute(backend, cgraph);
 }
 
@@ -726,15 +732,15 @@ GGML_CALL static void ggml_backend_cpu_graph_plan_free(ggml_backend_t backend, g
     GGML_UNUSED(backend);
 }
 
-GGML_CALL static void ggml_backend_cpu_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
+GGML_CALL static enum ggml_status ggml_backend_cpu_graph_plan_compute(ggml_backend_t backend, ggml_backend_graph_plan_t plan) {
     struct ggml_backend_plan_cpu * cpu_plan = (struct ggml_backend_plan_cpu *)plan;
 
-    ggml_graph_compute(&cpu_plan->cgraph, &cpu_plan->cplan);
+    return ggml_graph_compute(&cpu_plan->cgraph, &cpu_plan->cplan);
 
     GGML_UNUSED(backend);
 }
 
-GGML_CALL static bool ggml_backend_cpu_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
+GGML_CALL static enum ggml_status ggml_backend_cpu_graph_compute(ggml_backend_t backend, struct ggml_cgraph * cgraph) {
     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
 
     struct ggml_cplan cplan = ggml_graph_plan(cgraph, cpu_ctx->n_threads);
@@ -749,8 +755,7 @@ GGML_CALL static bool ggml_backend_cpu_graph_compute(ggml_backend_t backend, str
     cplan.abort_callback      = cpu_ctx->abort_callback;
     cplan.abort_callback_data = cpu_ctx->abort_callback_data;
 
-    ggml_graph_compute(cgraph, &cplan);
-    return true;
+    return ggml_graph_compute(cgraph, &cplan);
 }
 
 GGML_CALL static bool ggml_backend_cpu_supports_op(ggml_backend_t backend, const struct ggml_tensor * op) {
@@ -781,6 +786,11 @@ static struct ggml_backend_i cpu_backend_i = {
     /* .supports_op             = */ ggml_backend_cpu_supports_op,
 };
 
+static ggml_guid_t ggml_backend_cpu_guid(void) {
+    static ggml_guid guid = { 0xaa, 0x67, 0xc7, 0x43, 0x96, 0xe6, 0xa3, 0x8a, 0xe3, 0xaf, 0xea, 0x92, 0x36, 0xbc, 0xfc, 0x89 };
+    return &guid;
+}
+
 ggml_backend_t ggml_backend_cpu_init(void) {
     struct ggml_backend_cpu_context * ctx = malloc(sizeof(struct ggml_backend_cpu_context));
     if (ctx == NULL) {
@@ -800,6 +810,7 @@ ggml_backend_t ggml_backend_cpu_init(void) {
     }
 
     *cpu_backend = (struct ggml_backend) {
+        /* .guid      = */ ggml_backend_cpu_guid(),
         /* .interface = */ cpu_backend_i,
         /* .context   = */ ctx
     };
@@ -807,7 +818,7 @@ ggml_backend_t ggml_backend_cpu_init(void) {
 }
 
 GGML_CALL bool ggml_backend_is_cpu(ggml_backend_t backend) {
-    return backend && backend->iface.get_name == ggml_backend_cpu_name;
+    return backend != NULL && ggml_guid_matches(backend->guid, ggml_backend_cpu_guid());
 }
 
 void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
@@ -1425,7 +1436,7 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
     return true;
 }
 
-static bool ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
+static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     uint64_t copy_us[GGML_MAX_BACKENDS] = {0};
     uint64_t compute_us[GGML_MAX_BACKENDS] = {0};
 
@@ -1460,8 +1471,9 @@ static bool ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
 
         uint64_t compute_start_us = ggml_time_us();
         if (!sched->callback_eval) {
-            if (!ggml_backend_graph_compute(split_backend, &split->graph)) {
-                return false;
+            enum ggml_status ec = ggml_backend_graph_compute(split_backend, &split->graph);
+            if (ec != GGML_STATUS_SUCCESS) {
+                return ec;
             }
             //ggml_backend_synchronize(split_backend); // necessary to measure compute time
         } else {
@@ -1482,8 +1494,9 @@ static bool ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
 
                 struct ggml_cgraph gv = ggml_graph_view(&split->graph, j0, j1 + 1);
 
-                if (!ggml_backend_graph_compute(split_backend, &gv)) {
-                    return false;
+                enum ggml_status ec = ggml_backend_graph_compute(split_backend, &gv);
+                if (ec != GGML_STATUS_SUCCESS) {
+                    return ec;
                 }
 
                 if (need && !sched->callback_eval(t, false, sched->callback_eval_user_data)) {
@@ -1507,7 +1520,7 @@ static bool ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     }
 #endif
 
-    return true;
+    return GGML_STATUS_SUCCESS;
 }
 
 ggml_backend_sched_t ggml_backend_sched_new(ggml_backend_t * backends, ggml_backend_buffer_type_t * bufts, int n_backends, size_t graph_size) {
@@ -1569,7 +1582,7 @@ bool ggml_backend_sched_reserve(ggml_backend_sched_t sched, struct ggml_cgraph *
     return true;
 }
 
-bool ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
+enum ggml_status ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
     GGML_ASSERT((int)sched->hash_set.size >= graph->n_nodes + GGML_MAX_SPLITS*GGML_MAX_SPLIT_INPUTS);
 
     if (!sched->is_reset) {
@@ -1578,14 +1591,10 @@ bool ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cg
 
     ggml_backend_sched_split_graph(sched, graph);
     if (!ggml_backend_sched_alloc_splits(sched)) {
-        return false;
+        return GGML_STATUS_ALLOC_FAILED;
     }
 
-    if (!ggml_backend_sched_compute_splits(sched)) {
-        return false;
-    }
-
-    return true;
+    return ggml_backend_sched_compute_splits(sched);
 }
 
 void ggml_backend_sched_set_eval_callback(ggml_backend_sched_t sched, ggml_backend_sched_eval_callback callback, void * user_data) {

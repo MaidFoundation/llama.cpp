@@ -362,7 +362,7 @@ class GGUFWriter:
         self.add_bool(Keys.Attention.CAUSAL.format(arch=self.arch), value)
 
     def add_pooling_type(self, value: PoolingType) -> None:
-        self.add_uint32(Keys.LLM.POOLING_TYPE.format(arch=self.arch), value)
+        self.add_uint32(Keys.LLM.POOLING_TYPE.format(arch=self.arch), value.value)
 
     def add_rope_dimension_count(self, count: int) -> None:
         self.add_uint32(Keys.Rope.DIMENSION_COUNT.format(arch=self.arch), count)
@@ -381,6 +381,18 @@ class GGUFWriter:
 
     def add_rope_scaling_finetuned(self, value: bool) -> None:
         self.add_bool(Keys.Rope.SCALING_FINETUNED.format(arch=self.arch), value)
+
+    def add_ssm_conv_kernel(self, value: int) -> None:
+        self.add_uint32(Keys.SSM.CONV_KERNEL.format(arch=self.arch), value)
+
+    def add_ssm_inner_size(self, value: int) -> None:
+        self.add_uint32(Keys.SSM.INNER_SIZE.format(arch=self.arch), value)
+
+    def add_ssm_state_size(self, value: int) -> None:
+        self.add_uint32(Keys.SSM.STATE_SIZE.format(arch=self.arch), value)
+
+    def add_ssm_time_step_rank(self, value: int) -> None:
+        self.add_uint32(Keys.SSM.TIME_STEP_RANK.format(arch=self.arch), value)
 
     def add_tokenizer_model(self, model: str) -> None:
         self.add_string(Keys.Tokenizer.MODEL, model)

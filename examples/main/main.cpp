@@ -511,6 +511,14 @@ int main(int argc, char ** argv) {
     std::vector<llama_token> embd;
     std::vector<llama_token> embd_guidance;
 
+    // tokenized antiprompts
+    std::vector<std::vector<llama_token>> antiprompt_ids;
+
+    antiprompt_ids.reserve(params.antiprompt.size());
+    for (const std::string & antiprompt : params.antiprompt) {
+        antiprompt_ids.emplace_back(::llama_tokenize(ctx, antiprompt, false, true));
+    }
+
     struct llama_sampling_context * ctx_sampling = llama_sampling_init(sparams);
 
     while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
@@ -548,8 +556,8 @@ int main(int argc, char ** argv) {
                     LOG("context full, swapping: n_past = %d, n_left = %d, n_ctx = %d, n_keep = %d, n_discard = %d\n",
                             n_past, n_left, n_ctx, params.n_keep, n_discard);
 
-                    llama_kv_cache_seq_rm   (ctx, 0, params.n_keep            , params.n_keep + n_discard);
-                    llama_kv_cache_seq_shift(ctx, 0, params.n_keep + n_discard, n_past, -n_discard);
+                    llama_kv_cache_seq_rm (ctx, 0, params.n_keep            , params.n_keep + n_discard);
+                    llama_kv_cache_seq_add(ctx, 0, params.n_keep + n_discard, n_past, -n_discard);
 
                     n_past -= n_discard;
 
@@ -576,9 +584,9 @@ int main(int argc, char ** argv) {
                     LOG("div:   [%6d, %6d] / %6d -> [%6d, %6d]\n", ga_i + ib*bd, ga_i + ib*bd + ga_w, ga_n, (ga_i + ib*bd)/ga_n, (ga_i + ib*bd + ga_w)/ga_n);
                     LOG("shift: [%6d, %6d] + %6d -> [%6d, %6d]\n", ga_i + ib*bd + ga_w, n_past + ib*bd, dd, ga_i + ib*bd + ga_w + dd, n_past + ib*bd + dd);
 
-                    llama_kv_cache_seq_shift(ctx, 0, ga_i,                n_past,              ib*bd);
-                    llama_kv_cache_seq_div  (ctx, 0, ga_i + ib*bd,        ga_i + ib*bd + ga_w, ga_n);
-                    llama_kv_cache_seq_shift(ctx, 0, ga_i + ib*bd + ga_w, n_past + ib*bd,      dd);
+                    llama_kv_cache_seq_add(ctx, 0, ga_i,                n_past,              ib*bd);
+                    llama_kv_cache_seq_div(ctx, 0, ga_i + ib*bd,        ga_i + ib*bd + ga_w, ga_n);
+                    llama_kv_cache_seq_add(ctx, 0, ga_i + ib*bd + ga_w, n_past + ib*bd,      dd);
 
                     n_past -= bd;
 
@@ -769,6 +777,18 @@ int main(int argc, char ** argv) {
                     }
                 }
 
+                // check for reverse prompt using special tokens
+                llama_token last_token = llama_sampling_last(ctx_sampling);
+                for (std::vector<llama_token> ids : antiprompt_ids) {
+                    if (ids.size() == 1 && last_token == ids[0]) {
+                        if (params.interactive) {
+                            is_interacting = true;
+                        }
+                        is_antiprompt = true;
+                        break;
+                    }
+                }
+
                 if (is_antiprompt) {
                     LOG("found antiprompt: %s\n", last_output.c_str());
                 }
@@ -858,6 +878,7 @@ int main(int argc, char ** argv) {
                     const auto line_pfx = ::llama_tokenize(ctx, params.input_prefix, false, true);
                     const auto line_inp = ::llama_tokenize(ctx, buffer,              false, false);
                     const auto line_sfx = ::llama_tokenize(ctx, params.input_suffix, false, true);
+
                     LOG("input tokens: %s\n", LOG_TOKENS_TOSTR_PRETTY(ctx, line_inp).c_str());
 
                     embd_inp.insert(embd_inp.end(), line_pfx.begin(), line_pfx.end());
