@@ -4,7 +4,8 @@ Feature: llama.cpp server
 
   Background: Server startup
     Given a server listening on localhost:8080
-    And   a model file tinyllamas/stories260K.gguf from HF repo ggml-org/models
+    And   a model url https://huggingface.co/ggml-org/models/resolve/main/tinyllamas/stories260K.gguf
+    And   a model file stories260K.gguf
     And   a model alias tinyllama-2
     And   42 as server seed
       # KV Cache corresponds to the total amount of tokens
@@ -34,9 +35,9 @@ Feature: llama.cpp server
     And   metric llamacpp:tokens_predicted is <n_predicted>
 
     Examples: Prompts
-      | prompt                                                                    | n_predict | re_content                    | n_prompt | n_predicted | truncated |
-      | I believe the meaning of life is                                          | 8         | (read\|going)+                | 18       | 8           | not       |
-      | Write a joke about AI from a very long prompt which will not be truncated | 256       | (princesses\|everyone\|kids)+ | 46       | 64          | not       |
+      | prompt                                                                    | n_predict | re_content                                  | n_prompt | n_predicted | truncated |
+      | I believe the meaning of life is                                          | 8         | (read\|going)+                              | 18       | 8           | not       |
+      | Write a joke about AI from a very long prompt which will not be truncated | 256       | (princesses\|everyone\|kids\|Anna\|forest)+ | 46       | 64          | not       |
 
   Scenario: Completion prompt truncated
     Given a prompt:
@@ -47,7 +48,7 @@ Feature: llama.cpp server
     Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
     """
     And   a completion request with no api error
-    Then  64 tokens are predicted matching fun|Annaks|popcorns|pictry
+    Then  64 tokens are predicted matching fun|Annaks|popcorns|pictry|bowl
     And   the completion is  truncated
     And   109 prompt tokens are processed
 
@@ -64,9 +65,9 @@ Feature: llama.cpp server
     And   the completion is <truncated> truncated
 
     Examples: Prompts
-      | model        | system_prompt               | user_prompt                          | max_tokens | re_content             | n_prompt | n_predicted | enable_streaming | truncated |
-      | llama-2      | Book                        | What is the best book                | 8          | (Here\|what)+          | 77       | 8           | disabled         | not       |
-      | codellama70b | You are a coding assistant. | Write the fibonacci function in c++. | 128        | (thanks\|happy\|bird)+ | -1       | 64          | enabled          |           |
+      | model        | system_prompt               | user_prompt                          | max_tokens | re_content                        | n_prompt | n_predicted | enable_streaming | truncated |
+      | llama-2      | Book                        | What is the best book                | 8          | (Here\|what)+                     | 77       | 8           | disabled         | not       |
+      | codellama70b | You are a coding assistant. | Write the fibonacci function in c++. | 128        | (thanks\|happy\|bird\|Annabyear)+ | -1       | 64          | enabled          |           |
 
 
   Scenario: Tokenize / Detokenize
