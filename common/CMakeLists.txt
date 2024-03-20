@@ -43,6 +43,7 @@ if (EXISTS GIT_INDEX)
         VERBATIM
     )
     set(TARGET build_info)
+    set(LLAMA_COMMON_EXTRA_LIBS build_info)
     add_library(${TARGET} OBJECT build-info.cpp)
 endif()
 
@@ -65,8 +66,6 @@ add_library(${TARGET} STATIC
 if (BUILD_SHARED_LIBS)
     set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
-
-set(LLAMA_COMMON_EXTRA_LIBS build_info)
 
 # Use curl to download model url
 if (LLAMA_CURL)
