@@ -369,6 +369,7 @@ extern "C" {
         GGML_TYPE_I32     = 26,
         GGML_TYPE_I64     = 27,
         GGML_TYPE_F64     = 28,
+        GGML_TYPE_IQ1_M   = 29,
         GGML_TYPE_COUNT,
     };
 
@@ -408,6 +409,7 @@ extern "C" {
         GGML_FTYPE_MOSTLY_IQ3_S   = 20, // except 1d tensors
         GGML_FTYPE_MOSTLY_IQ2_S   = 21, // except 1d tensors
         GGML_FTYPE_MOSTLY_IQ4_XS  = 22, // except 1d tensors
+        GGML_FTYPE_MOSTLY_IQ1_M   = 23, // except 1d tensors
     };
 
     // available tensor operations:
@@ -748,6 +750,7 @@ extern "C" {
     GGML_API GGML_CALL bool ggml_is_transposed(const struct ggml_tensor * tensor);
     GGML_API GGML_CALL bool ggml_is_contiguous(const struct ggml_tensor * tensor);
     GGML_API GGML_CALL bool ggml_is_permuted  (const struct ggml_tensor * tensor);
+    GGML_API GGML_CALL bool ggml_is_empty     (const struct ggml_tensor * tensor);
     GGML_API           bool ggml_is_scalar    (const struct ggml_tensor * tensor);
     GGML_API           bool ggml_is_vector    (const struct ggml_tensor * tensor);
     GGML_API           bool ggml_is_matrix    (const struct ggml_tensor * tensor);
@@ -1161,8 +1164,7 @@ extern "C" {
     //  ggml_mul_mat_id(ctx, as, ids, id, b) ~= ggml_mul_mat(as[ids[id]], b)
     GGML_API struct ggml_tensor * ggml_mul_mat_id(
             struct ggml_context * ctx,
-            struct ggml_tensor  * const as[],
-            int                   n_as,
+            struct ggml_tensor  * as,
             struct ggml_tensor  * ids,
             int                   id,
             struct ggml_tensor  * b);
