@@ -1222,11 +1222,11 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
         gpt_print_usage(argc, argv, gpt_params());
         exit(0);
     }
-    if (arg == "--version") {
-        fprintf(stderr, "version: %d (%s)\n", LLAMA_BUILD_NUMBER, LLAMA_COMMIT);
-        fprintf(stderr, "built with %s for %s\n", LLAMA_COMPILER, LLAMA_BUILD_TARGET);
-        exit(0);
-    }
+    //if (arg == "--version") {
+    //    fprintf(stderr, "version: %d (%s)\n", LLAMA_BUILD_NUMBER, LLAMA_COMMIT);
+    //    fprintf(stderr, "built with %s for %s\n", LLAMA_COMPILER, LLAMA_BUILD_TARGET);
+    //    exit(0);
+    //}
     if (arg == "--random-prompt") {
         params.random_prompt = true;
         return true;
@@ -2552,8 +2552,8 @@ void dump_non_result_info_yaml(FILE * stream, const gpt_params & params, const l
                                const std::string & timestamp, const std::vector<int> & prompt_tokens, const char * model_desc) {
     const llama_sampling_params & sparams = params.sparams;
 
-    fprintf(stream, "build_commit: %s\n",        LLAMA_COMMIT);
-    fprintf(stream, "build_number: %d\n",        LLAMA_BUILD_NUMBER);
+    //fprintf(stream, "build_commit: %s\n",        LLAMA_COMMIT);
+    //fprintf(stream, "build_number: %d\n",        LLAMA_BUILD_NUMBER);
     fprintf(stream, "cpu_has_arm_fma: %s\n",     ggml_cpu_has_arm_fma()     ? "true" : "false");
     fprintf(stream, "cpu_has_avx: %s\n",         ggml_cpu_has_avx()         ? "true" : "false");
     fprintf(stream, "cpu_has_avx_vnni: %s\n",    ggml_cpu_has_avx_vnni()    ? "true" : "false");
